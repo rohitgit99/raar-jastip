@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>RAAR JASTIP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  window.tailwind = window.tailwind || {};
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          bg: 'var(--bg)', card: 'var(--card)', ink: 'var(--fg)', muted: 'var(--muted)',
+          line: 'var(--line)', soft: 'var(--soft)', acc: 'var(--accent)', 'acc-h': 'var(--accent-h)',
+          ann: 'var(--ann-bg)'
+        }
+      }
+    }
+  };
+</script>
+<style>
+  /* Layout: sticky store header over a single-column storefront; catalog grid 2 -> 3 -> 4 columns; cart as a right-hand drawer. */
+  :root {
+    --bg: #fafaf9;          /* stone-50 */
+    --card: #ffffff;
+    --fg: #292524;          /* stone-800 */
+    --muted: #78716c;       /* stone-500 */
+    --line: #e7e5e4;        /* stone-200 */
+    --soft: #f5f5f4;        /* stone-100 */
+    --accent: #059669;      /* emerald-600 */
+    --accent-h: #047857;    /* emerald-700 */
+    --ann-bg: #1c1917;
+    --tile-l1: 90%;
+    --tile-l2: 82%;
+    --tile-ink: 28%;
+    --font-display: 'Bricolage Grotesque', 'Trebuchet MS', system-ui, sans-serif;
+    --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141211; --card: #1e1b19; --fg: #f5f5f4; --muted: #a8a29e; --line: #33302d; --soft: #292524;
+      --accent: #047857; --accent-h: #059669; --ann-bg: #0b0a09;
+      --tile-l1: 26%; --tile-l2: 20%; --tile-ink: 80%;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141211; --card: #1e1b19; --fg: #f5f5f4; --muted: #a8a29e; --line: #33302d; --soft: #292524;
+    --accent: #047857; --accent-h: #059669; --ann-bg: #0b0a09;
+    --tile-l1: 26%; --tile-l2: 20%; --tile-ink: 80%;
+    color-scheme: dark;
+  }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; margin: 0; }
+  .font-display { font-family: var(--font-display); }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent-h); outline-offset: 2px; }
+  [data-theme="dark"] :focus-visible { outline-color: #34d399; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) :focus-visible { outline-color: #34d399; } }
+  .field {
+    width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; font-size: 14px; min-width: 0;
+  }
+  .field::placeholder { color: var(--muted); opacity: .8; }
+  .field:focus { border-color: var(--accent-h); outline: none; box-shadow: 0 0 0 3px rgba(5,150,105,.2); }
+  .field[aria-invalid="true"] { border-color: #dc2626; }
+  .tile {
+    background: linear-gradient(140deg, hsl(var(--h) 70% var(--tile-l1)), hsl(calc(var(--h) + 24) 62% var(--tile-l2)));
+    color: hsl(var(--h) 45% var(--tile-ink));
+  }
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .drawer { transition: transform .28s cubic-bezier(.3,.8,.3,1), visibility .28s; }
+  .scrim { transition: opacity .25s; }
+  .faq-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .25s ease; }
+  .faq-body[data-open="true"] { grid-template-rows: 1fr; }
+  .faq-body > div { overflow: hidden; }
+  @keyframes pop { from { transform: translateY(8px); opacity: 0 } to { transform: none; opacity: 1 } }
+  .toast { animation: pop .22s ease both; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .drawer, .scrim, .faq-body { transition: none; }
+    .toast { animation: none; }
+  }
+</style>
+
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" crossorigin="anonymous"></script>
+
+<script>
+(function () {
+  var m = [];
+  if (!window.React) m.push('React');
+  if (!window.ReactDOM) m.push('ReactDOM');
+  if (!window.htm) m.push('htm (unpkg.com)');
+  function show(title, body) {
+    var r = document.getElementById('root');
+    if (r && !r.children.length) {
+      r.innerHTML = '<div style="font-family:system-ui,sans-serif;padding:24px;max-width:480px;margin:auto;line-height:1.5"><h2 style="margin:0 0 8px">' + title + '</h2><p>' + body + '</p></div>';
+    }
+  }
+  if (m.length) {
+    window.__missing = m;
+    show('Gagal memuat pustaka', 'Bagian ini tidak bisa diunduh: ' + m.join(', ') + '. Pastikan internet aktif lalu muat ulang halaman. Kalau masih sama, kirim tulisan ini ke Claude.');
+  }
+  window.addEventListener('error', function (e) {
+    show('Terjadi error', String(e.message || e) + ' ' + (e.filename ? '(' + e.filename.split('/').pop() + ':' + e.lineno + ')' : ''));
+  });
+})();
+</script>
+<script>
+(function () {
+  if (window.__missing) return;
+  var React = window.React, ReactDOM = window.ReactDOM;
+  var useState = React.useState, useEffect = React.useEffect, useMemo = React.useMemo, useRef = React.useRef;
+  var html = window.htm.bind(React.createElement);
+
+  /* ---------- Admin configuration ---------- */
+  var CONFIG = {
+    waNumber: '6285182671591',
+    location: 'Medan, Indonesia',
+    shipping: {
+      cod: { id: 'cod', label: 'COD / Ambil di Medan', fee: 0, note: 'Gratis ongkir, ketemu atau ambil di Medan' },
+      courier: { id: 'courier', label: 'Kurir Lokal Medan', fee: 10000, note: 'Antar ke alamat area Medan' }
+    },
+    sheetUrl: '', // tempel link Google Sheets (Publish to web, format CSV). Kosong = pakai daftar PRODUCTS di bawah
+    closeAt: '2026-10-25T10:00:00+07:00', // close order edisi Diwali; kosongkan agar jadi tiap Sabtu
+    closeDay: 6,      // Sabtu
+    closeHourWib: 21  // 21:00 WIB
+  };
+
+  var CATEGORY_ORDER = ['Edisi Diwali', 'Snack & Food', 'Skincare & Beauty', 'Personal Care', 'Fashion'];
+  var CAT_ICON = { 'Edisi Diwali': 'Flame', 'Snack & Food': 'Cookie', 'Skincare & Beauty': 'Sparkles', 'Personal Care': 'Droplets', 'Fashion': 'Shirt' };
+
+  var PRODUCTS = [
+    /* Edisi Diwali dan tambahan. price: null = harga dikonfirmasi admin. Isi angka (contoh price: 45000) kalau harganya sudah pasti. */
+    { id: 'p11', name: 'Muruku', category: 'Edisi Diwali', price: null, badge: 'Diwali', variants: ['Varian sesuai stok'], hue: 38, icon: 'Cookie' },
+    { id: 'p12', name: 'Mixture', category: 'Edisi Diwali', price: null, badge: 'Diwali', variants: ['Varian sesuai stok'], hue: 30, icon: 'Wheat' },
+    { id: 'p13', name: 'Coklat Edisi Diwali', category: 'Edisi Diwali', price: null, badge: 'Diwali', variants: ['Varian sesuai stok'], hue: 20, icon: 'Candy' },
+    { id: 'p14', name: 'Vitamin', category: 'Edisi Diwali', price: null, badge: 'Diwali', variants: ['Varian sesuai stok'], hue: 160, icon: 'Pill' },
+    { id: 'p15', name: 'Vincci (Sepatu & Tas)', category: 'Edisi Diwali', price: null, badge: 'Request', variants: ['Model, ukuran & warna via admin'], hue: 330, icon: 'Footprints' },
+    { id: 'p16', name: 'Aksesoris India (ACC India)', category: 'Edisi Diwali', price: null, badge: 'Diwali', variants: ['Varian sesuai stok'], hue: 300, icon: 'Gem' },
+    { id: 'p17', name: 'Perlengkapan Sembahyang', category: 'Edisi Diwali', price: null, badge: 'Diwali', variants: ['Varian sesuai stok'], hue: 10, icon: 'Flame' },
+    { id: 'p18', name: 'Hiasan Diwali', category: 'Edisi Diwali', price: null, badge: 'Diwali', variants: ['Varian sesuai stok'], hue: 45, icon: 'Lamp' },
+    { id: 'p19', name: 'Dubai Chocolate', category: 'Snack & Food', price: null, badge: 'Viral', variants: ['Pistachio Kunafa', 'Varian lain (tanya admin)'], hue: 28, icon: 'Candy' }
+  ];
+
+  var FAQS = [
+    {
+      q: 'Bagaimana cara order?',
+      a: ['1. Pilih barang dari katalog, atau isi form Request Barang Custom kalau barangnya tidak ada.',
+          '2. Buka keranjang, isi data pemesan dan pilih pengiriman.',
+          '3. Tekan "Kirim Order via WhatsApp". Pesanan tersusun otomatis, tinggal kirim ke admin.']
+    },
+    {
+      q: 'Berapa DP dan bagaimana kalau barang habis?',
+      a: ['DP minimal 50% dibayar saat admin mengonfirmasi pesananmu. Sisanya dilunasi sebelum barang dikirim atau diambil.',
+          'Kalau barang habis di Malaysia, admin akan menawarkan varian pengganti. Jika kamu tidak mau, DP untuk barang tersebut dikembalikan penuh.']
+    },
+    {
+      q: 'Berapa lama barang sampai di Medan?',
+      a: ['Barang dibelikan setelah batch close, lalu dibawa ke Medan. Admin akan mengabari estimasi tanggal tiba saat konfirmasi, dan setiap perkembangan lewat WhatsApp.',
+          'Setelah tiba, kamu bisa COD atau ambil di Medan (gratis), atau pakai kurir lokal Medan seharga Rp 10.000.']
+    }
+  ];
+
+  /* ---------- Helpers ---------- */
+  function rupiah(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+
+  function hashHue(str) {
+    var h = 0;
+    for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360;
+    return h;
+  }
+
+  /* Pembaca CSV sederhana (mendukung tanda kutip dan koma di dalam sel) */
+  function parseCSV(text) {
+    var rows = [], row = [], cur = '', q = false;
+    text = String(text || '').replace(/^﻿/, '');
+    for (var i = 0; i < text.length; i++) {
+      var c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else { q = false; } }
+        else { cur += c; }
+      } else if (c === '"') { q = true; }
+      else if (c === ',') { row.push(cur); cur = ''; }
+      else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+      else if (c !== '\r') { cur += c; }
+    }
+    if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+
+  /* Ubah baris sheet menjadi daftar produk. Kolom: id, nama, kategori, harga, badge, varian, stok, aktif, ikon, warna */
+  function rowsToProducts(rows) {
+    if (!rows || rows.length < 2) return [];
+    var head = rows[0].map(function (h) { return String(h).trim().toLowerCase(); });
+    function col() {
+      for (var a = 0; a < arguments.length; a++) { var i = head.indexOf(arguments[a]); if (i !== -1) return i; }
+      return -1;
+    }
+    var ix = { id: col('id'), name: col('nama', 'name'), cat: col('kategori', 'category'), price: col('harga', 'price'),
+      badge: col('badge', 'label'), variants: col('varian', 'variants'), stock: col('stok', 'status'),
+      active: col('aktif', 'active'), icon: col('ikon', 'icon'), hue: col('warna', 'hue') };
+    function get(r, k) { return ix[k] === -1 || r[ix[k]] === undefined ? '' : String(r[ix[k]]).trim(); }
+    var out = [];
+    for (var n = 1; n < rows.length; n++) {
+      var r = rows[n];
+      var name = get(r, 'name');
+      if (!name) continue;
+      if (/^(tidak|no|n|false|0|off|sembunyi)$/i.test(get(r, 'active'))) continue;
+      var digits = get(r, 'price').replace(/[^0-9]/g, '');
+      var stockRaw = get(r, 'stock').toLowerCase();
+      var variants = get(r, 'variants').split('|').map(function (v) { return v.trim(); }).filter(Boolean);
+      var iconName = get(r, 'icon');
+      var hasIcon = iconName && window.lucide && window.lucide.icons && window.lucide.icons[iconName];
+      var hue = parseInt(get(r, 'hue'), 10);
+      out.push({
+        id: get(r, 'id') || ('s' + n),
+        name: name,
+        category: get(r, 'cat') || 'Lainnya',
+        price: digits ? parseInt(digits, 10) : null,
+        badge: get(r, 'badge'),
+        variants: variants.length ? variants : ['Varian sesuai stok'],
+        stock: /habis|sold|kosong/.test(stockRaw) ? 'habis' : (/^(po|pre)/.test(stockRaw) ? 'po' : 'ready'),
+        hue: isNaN(hue) ? hashHue(name) : hue,
+        icon: hasIcon ? iconName : undefined
+      });
+    }
+    return out;
+  }
+
+  function loadBuyer() {
+    try { var raw = localStorage.getItem('raar-buyer'); if (raw) return JSON.parse(raw) || {}; } catch (e) {}
+    return {};
+  }
+
+  function nextClose() {
+    var fixed = Date.parse(CONFIG.closeAt);
+    if (fixed && fixed > Date.now()) return fixed;
+    var wib = new Date(Date.now() + 7 * 3600 * 1000);
+    var add = (CONFIG.closeDay - wib.getUTCDay() + 7) % 7;
+    var t = Date.UTC(wib.getUTCFullYear(), wib.getUTCMonth(), wib.getUTCDate() + add, CONFIG.closeHourWib - 7, 0, 0);
+    if (t <= Date.now()) t += 7 * 24 * 3600 * 1000;
+    return t;
+  }
+
+  function toEl(n, k) {
+    if (!Array.isArray(n) || typeof n[0] !== 'string') return null;
+    var attrs = Object.assign({}, n[1] || {});
+    attrs.key = k;
+    var kids = Array.isArray(n[2]) ? n[2].map(function (c, i) { return toEl(c, i); }) : undefined;
+    return React.createElement(n[0], attrs, kids);
+  }
+
+  function Icon(props) {
+    var size = props.size || 20;
+    var lib = window.lucide;
+    var def = lib && lib.icons && lib.icons[props.name];
+    var kids = [];
+    if (Array.isArray(def)) {
+      var list = typeof def[0] === 'string' ? (def[2] || []) : def;
+      kids = list.map(function (n, i) { return toEl(n, i); });
+    }
+    return React.createElement('svg', {
+      xmlns: 'http://www.w3.org/2000/svg', width: size, height: size, viewBox: '0 0 24 24',
+      fill: 'none', stroke: 'currentColor', strokeWidth: props.stroke || 2,
+      strokeLinecap: 'round', strokeLinejoin: 'round', className: props.className, 'aria-hidden': 'true'
+    }, kids);
+  }
+
+  function loadCart() {
+    try { var raw = localStorage.getItem('raar-cart'); if (raw) return JSON.parse(raw); } catch (e) {}
+    return { items: [], customs: [] };
+  }
+
+  /* ---------- Countdown ---------- */
+  function useCountdown(target) {
+    var s = useState(Math.max(0, target - Date.now())); var left = s[0], setLeft = s[1];
+    useEffect(function () {
+      var id = setInterval(function () { setLeft(Math.max(0, target - Date.now())); }, 1000);
+      return function () { clearInterval(id); };
+    }, [target]);
+    var total = Math.floor(left / 1000);
+    return { d: Math.floor(total / 86400), h: Math.floor(total / 3600) % 24, m: Math.floor(total / 60) % 60, s: total % 60 };
+  }
+
+  function Countdown() {
+    var target = useMemo(nextClose, []);
+    var c = useCountdown(target);
+    function cell(v, l) {
+      return html`<span className="inline-flex items-baseline gap-0.5 rounded-md bg-white/10 px-1.5 py-0.5 tabular-nums" style=${{ fontVariantNumeric: 'tabular-nums' }}>
+        <b className="font-semibold">${String(v).padStart(2, '0')}</b><span className="text-[10px] opacity-70">${l}</span></span>`;
+    }
+    return html`<span className="inline-flex items-center gap-1" role="timer" aria-label="Hitung mundur close order">
+      ${cell(c.d, 'h')}${cell(c.h, 'j')}${cell(c.m, 'm')}${cell(c.s, 'd')}</span>`;
+  }
+
+  function AnnouncementBar() {
+    return html`<div className="bg-ann text-stone-100">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-1.5 px-4 py-2 text-center text-[12px] font-semibold tracking-wide">
+        <span className="uppercase">PO MALAYSIA BATCH OPEN <span className="opacity-40">|</span> Close Order Segera <span className="opacity-40">|</span> Delivery Medan</span>
+        <${Countdown} />
+      </div>
+    </div>`;
+  }
+
+  /* ---------- Header ---------- */
+  function Header(props) {
+    return html`<header className="sticky z-30 border-b border-line bg-bg" style=${{ top: 'env(safe-area-inset-top, 0px)' }}>
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-acc text-white"><${Icon} name="Package" size=${20} /></span>
+          <div className="min-w-0">
+            <div className="font-display text-[19px] font-extrabold leading-none tracking-tight">RAAR JASTIP</div>
+            <div className="mt-1 truncate text-[11.5px] text-muted">Jastip Malaysia - Medan Terpercaya</div>
+          </div>
+        </div>
+        <button type="button" onClick=${props.onOpen} aria-label=${'Buka keranjang, ' + props.count + ' barang'}
+          className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-line bg-card transition hover:bg-soft">
+          <${Icon} name="ShoppingBag" size=${21} />
+          ${props.count > 0 && html`<span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-[20px] place-items-center rounded-full bg-acc px-1 text-[11px] font-bold text-white">${props.count}</span>`}
+        </button>
+      </div>
+    </header>`;
+  }
+
+  /* ---------- Product card ---------- */
+  function ProductCard(props) {
+    var p = props.product;
+    var v = useState(p.variants[0]); var variant = v[0], setVariant = v[1];
+    var q = useState(1); var qty = q[0], setQty = q[1];
+    var iconName = p.icon || CAT_ICON[p.category] || 'Package';
+    var soldOut = p.stock === 'habis';
+    var askHref = 'https://wa.me/' + CONFIG.waNumber + '?text=' + encodeURIComponent('Halo RAAR JASTIP! Saya mau tanya ketersediaan: ' + p.name + ' (' + variant + '). Masih bisa dititip?');
+    return html`<article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-card">
+      <div className="tile relative grid aspect-[4/3] place-items-center" style=${{ '--h': p.hue }}>
+        <span className="absolute left-2 top-2 rounded-full bg-card px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-ink">${p.badge}</span>
+        <${Icon} name=${iconName} size=${44} stroke=${1.5} />
+        <span className="absolute bottom-2 right-2.5 text-[10px] font-semibold uppercase tracking-widest opacity-70">${p.category}</span>
+      </div>
+      <div className="flex flex-1 flex-col gap-2.5 p-3">
+        <h3 className="min-h-[2.5rem] text-[13.5px] font-semibold leading-snug" style=${{ textWrap: 'balance' }}>${p.name}</h3>
+        <label className="sr-only" htmlFor=${'var-' + p.id}>Varian ${p.name}</label>
+        <select id=${'var-' + p.id} className="field !py-2 !text-[13px]" value=${variant} onChange=${function (e) { setVariant(e.target.value); }}>
+          ${p.variants.map(function (x) { return html`<option key=${x} value=${x}>${x}</option>`; })}
+        </select>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          ${p.price ? html`<div className="font-display text-[18px] font-extrabold tracking-tight">${rupiah(p.price)}</div>` : html`<div className="text-[14px] font-semibold leading-tight text-muted">Tanya harga ke admin</div>`}
+          ${p.stock === 'po' && html`<span className="rounded-full bg-soft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-muted">Pre-order</span>`}
+          ${soldOut && html`<span className="rounded-full bg-soft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-red-600">Habis</span>`}
+        </div>
+        <div className="mt-auto flex flex-col gap-2">
+          <div className=${'flex items-center justify-between rounded-xl border border-line bg-soft p-1 ' + (soldOut ? 'pointer-events-none opacity-50' : '')}>
+            <button type="button" aria-label="Kurangi jumlah" onClick=${function () { setQty(Math.max(1, qty - 1)); }}
+              className="grid h-8 w-8 place-items-center rounded-lg bg-card transition hover:opacity-80"><${Icon} name="Minus" size=${15} /></button>
+            <span className="min-w-[2ch] text-center text-[14px] font-bold tabular-nums" aria-live="polite">${qty}</span>
+            <button type="button" aria-label="Tambah jumlah" onClick=${function () { setQty(Math.min(99, qty + 1)); }}
+              className="grid h-8 w-8 place-items-center rounded-lg bg-card transition hover:opacity-80"><${Icon} name="Plus" size=${15} /></button>
+          </div>
+          <button type="button" disabled=${soldOut} onClick=${function () { props.onAdd(p, variant, qty); setQty(1); }}
+            className=${'flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition ' + (soldOut ? 'cursor-not-allowed bg-soft text-muted' : 'bg-acc text-white hover:bg-acc-h active:scale-[.98]')}>
+            <${Icon} name="ShoppingBag" size=${15} /> ${soldOut ? 'Stok Habis' : 'Tambah ke Keranjang'}
+          </button>
+          <a href=${askHref} target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-line px-3 py-2 text-[12.5px] font-semibold transition hover:bg-soft">
+            <${Icon} name="MessageCircle" size=${14} /> Tanya dulu
+          </a>
+        </div>
+      </div>
+    </article>`;
+  }
+
+  /* ---------- Custom request form ---------- */
+  function CustomRequest(props) {
+    var a = useState(''), name = a[0], setName = a[1];
+    var b = useState(''), store = b[0], setStore = b[1];
+    var sp = useState(''), spec = sp[0], setSpec = sp[1];
+    var c = useState(''), note = c[0], setNote = c[1];
+    var d = useState(false), tried = d[0], setTried = d[1];
+    function submit(e) {
+      e.preventDefault();
+      if (!name.trim()) { setTried(true); return; }
+      props.onAdd({ id: 'c' + Date.now(), name: name.trim(), store: store.trim(), spec: spec.trim(), note: note.trim() });
+      setName(''); setStore(''); setSpec(''); setNote(''); setTried(false);
+    }
+    return html`<section id="request" className="scroll-mt-24 rounded-3xl border border-line bg-card p-4 sm:p-6">
+      <div className="grid gap-6 md:grid-cols-[1fr_1.2fr] md:gap-10">
+        <div className="min-w-0">
+          <div className="mb-3 grid h-11 w-11 place-items-center rounded-xl bg-soft"><${Icon} name="Store" size=${22} /></div>
+          <h2 className="font-display text-[24px] font-extrabold leading-tight tracking-tight" style=${{ textWrap: 'balance' }}>Request Barang Custom</h2>
+          <p className="mt-2 max-w-[44ch] text-[14px] leading-relaxed text-muted">Barang yang kamu cari tidak ada di katalog? Titip saja. Tulis nama barang, toko di Malaysia kalau kamu tahu, ukuran atau warna, dan kisaran budget. Admin akan konfirmasi harga final lewat WhatsApp.</p>
+          <p className="mt-2 max-w-[44ch] text-[13px] leading-relaxed text-muted">Foto referensi bisa kamu kirim langsung di chat WhatsApp setelah pesanan terkirim.</p>
+        </div>
+        <form onSubmit=${submit} className="grid min-w-0 gap-3" noValidate>
+          <div>
+            <label htmlFor="cr-name" className="mb-1 block text-[12.5px] font-semibold">Nama Barang</label>
+            <input id="cr-name" className="field" placeholder="Contoh: Tas Pedro warna hitam" value=${name}
+              aria-invalid=${tried && !name.trim() ? 'true' : 'false'} onChange=${function (e) { setName(e.target.value); }} />
+            ${tried && !name.trim() && html`<p className="mt-1 text-[12px] text-red-600">Isi nama barang dulu ya.</p>`}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="min-w-0">
+              <label htmlFor="cr-store" className="mb-1 block text-[12.5px] font-semibold">Lokasi / Toko di Malaysia <span className="font-normal text-muted">(opsional)</span></label>
+              <input id="cr-store" className="field" placeholder="Pavilion KL, Watsons, Mr. DIY" value=${store} onChange=${function (e) { setStore(e.target.value); }} />
+            </div>
+            <div className="min-w-0">
+              <label htmlFor="cr-spec" className="mb-1 block text-[12.5px] font-semibold">Ukuran / Warna <span className="font-normal text-muted">(opsional)</span></label>
+              <input id="cr-spec" className="field" placeholder="Contoh: M, hitam" value=${spec} onChange=${function (e) { setSpec(e.target.value); }} />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="cr-note" className="mb-1 block text-[12.5px] font-semibold">Estimasi Budget / Catatan</label>
+            <textarea id="cr-note" rows="3" className="field resize-y" placeholder="Contoh: budget maks RM 150, kirim foto dulu" value=${note} onChange=${function (e) { setNote(e.target.value); }}></textarea>
+          </div>
+          <button type="submit" className="flex items-center justify-center gap-2 rounded-xl bg-acc px-4 py-3 text-[14px] font-semibold text-white transition hover:bg-acc-h active:scale-[.99]">
+            <${Icon} name="Plus" size=${17} /> Tambah Request Ke Keranjang
+          </button>
+        </form>
+      </div>
+    </section>`;
+  }
+
+  /* ---------- FAQ ---------- */
+  function FAQ() {
+    var s = useState(0); var open = s[0], setOpen = s[1];
+    return html`<section id="faq" className="scroll-mt-24">
+      <h2 className="font-display text-[24px] font-extrabold tracking-tight">Pertanyaan Umum</h2>
+      <div className="mt-4 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
+        ${FAQS.map(function (f, i) {
+          var isOpen = open === i;
+          return html`<div key=${i}>
+            <h3><button type="button" id=${'faq-btn-' + i} aria-expanded=${isOpen} aria-controls=${'faq-panel-' + i}
+              onClick=${function () { setOpen(isOpen ? -1 : i); }}
+              className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left text-[14.5px] font-semibold transition hover:bg-soft">
+              <span className="min-w-0">${f.q}</span>
+              <${Icon} name="ChevronDown" size=${18} className=${'shrink-0 transition-transform ' + (isOpen ? 'rotate-180' : '')} />
+            </button></h3>
+            <div id=${'faq-panel-' + i} role="region" aria-labelledby=${'faq-btn-' + i} className="faq-body" data-open=${isOpen ? 'true' : 'false'}>
+              <div><div className="space-y-2 px-4 pb-4 text-[14px] leading-relaxed text-muted">
+                ${f.a.map(function (t, j) { return html`<p key=${j}>${t}</p>`; })}
+              </div></div>
+            </div>
+          </div>`;
+        })}
+      </div>
+    </section>`;
+  }
+
+  /* ---------- Cart drawer ---------- */
+  function CartDrawer(props) {
+    var cart = props.cart;
+    var saved = useMemo(loadBuyer, []);
+    var s1 = useState(saved.ship === 'courier' ? 'courier' : 'cod'), ship = s1[0], setShip = s1[1];
+    var s2 = useState(saved.name || ''), cname = s2[0], setCname = s2[1];
+    var s3 = useState(saved.phone || ''), phone = s3[0], setPhone = s3[1];
+    var s4 = useState(saved.addr || ''), addr = s4[0], setAddr = s4[1];
+    var s5 = useState(false), tried = s5[0], setTried = s5[1];
+    var s6 = useState(''), copyState = s6[0], setCopyState = s6[1];
+    useEffect(function () {
+      try { localStorage.setItem('raar-buyer', JSON.stringify({ ship: ship, name: cname, phone: phone, addr: addr })); } catch (e) {}
+    }, [ship, cname, phone, addr]);
+
+    var items = cart.items.map(function (it) {
+      var p = props.products.find(function (x) { return x.id === it.pid; });
+      return { key: it.pid + '|' + it.variant, p: p, variant: it.variant, qty: it.qty };
+    }).filter(function (x) { return x.p; });
+    var customs = cart.customs;
+    var unpriced = items.some(function (x) { return !x.p.price; }) || customs.length > 0;
+    var subtotal = items.reduce(function (t, x) { return t + (x.p.price || 0) * x.qty; }, 0);
+    var shipping = CONFIG.shipping[ship];
+    var total = subtotal + shipping.fee;
+    var count = items.reduce(function (t, x) { return t + x.qty; }, 0) + customs.length;
+    var dp = Math.ceil(total / 2);
+
+    var phoneDigits = phone.replace(/\D/g, '');
+    var errs = {};
+    if (!cname.trim()) errs.name = 'Nama lengkap wajib diisi.';
+    if (phoneDigits.length < 9) errs.phone = 'Masukkan nomor WhatsApp yang valid.';
+    if (!addr.trim()) errs.addr = ship === 'cod' ? 'Isi alamat atau titik ketemu di Medan.' : 'Alamat lengkap wajib diisi.';
+    var valid = count > 0 && Object.keys(errs).length === 0;
+
+    function buildMessage() {
+      var L = [];
+      L.push('HAIII RAAR JASTIP! SAYA MAU ORDER:', '');
+      L.push('*DETAIL PEMESAN:*');
+      L.push('- Nama: ' + cname.trim());
+      L.push('- No. WA: ' + phone.trim());
+      L.push('- Pengiriman: ' + (ship === 'cod' ? 'COD Medan' : 'Kurir Lokal Medan'));
+      L.push('- Alamat: ' + addr.trim(), '');
+      if (items.length) {
+        L.push('*DAFTAR PESANAN CATALOG:*');
+        items.forEach(function (x, i) {
+          L.push((i + 1) + '. ' + x.p.name + ' x ' + x.qty + ' - ' + x.variant + ' (' + (x.p.price ? rupiah(x.p.price * x.qty) : 'Harga dikonfirmasi admin') + ')');
+        });
+        L.push('');
+      }
+      if (customs.length) {
+        L.push('*REQUEST BARANG CUSTOM:*');
+        customs.forEach(function (c) {
+          L.push('- ' + c.name + (c.store ? ' (Toko: ' + c.store + ')' : '') + (c.spec ? ' | Ukuran/Warna: ' + c.spec : '') + ' | Catatan/Budget: ' + (c.note || '-'));
+        });
+        L.push('');
+      }
+      L.push('*TOTAL ESTIMASI:* ' + rupiah(total) + (unpriced ? ' (belum termasuk barang yang harganya dikonfirmasi admin)' : ''));
+      L.push('*(Mohon infokan nomor rekening/QRIS untuk pembayaran DP ya!)*');
+      return L.join('\n');
+    }
+
+    var href = valid ? 'https://wa.me/' + CONFIG.waNumber + '?text=' + encodeURIComponent(buildMessage()) : undefined;
+
+    function onSend(e) {
+      if (!valid) { e.preventDefault(); setTried(true); }
+    }
+
+    function onCopy() {
+      if (!valid) { setTried(true); return; }
+      var msg = buildMessage();
+      function done(ok) { setCopyState(ok ? 'ok' : 'fail'); if (ok) setTimeout(function () { setCopyState(''); }, 2500); }
+      try { navigator.clipboard.writeText(msg).then(function () { done(true); }, function () { done(false); }); } catch (e) { done(false); }
+    }
+
+    function clearBuyer() {
+      setCname(''); setPhone(''); setAddr(''); setShip('cod'); setTried(false);
+      try { localStorage.removeItem('raar-buyer'); } catch (e) {}
+    }
+
+    function fieldErr(k) { return tried && errs[k] ? html`<p className="mt-1 text-[12px] text-red-600">${errs[k]}</p>` : null; }
+
+    return html`<div>
+      <div className=${'scrim fixed inset-0 z-40 bg-black/50 ' + (props.open ? 'opacity-100' : 'pointer-events-none opacity-0')} onClick=${props.onClose} aria-hidden="true"></div>
+      <aside role="dialog" aria-modal="true" aria-label="Keranjang belanja" aria-hidden=${!props.open}
+        className=${'drawer fixed right-0 top-0 z-50 flex h-full w-full max-w-[440px] flex-col border-l border-line bg-bg ' + (props.open ? 'translate-x-0 visible' : 'translate-x-full invisible')}
+        style=${{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className="flex items-center justify-between border-b border-line px-4 py-3.5">
+          <div>
+            <h2 className="font-display text-[20px] font-extrabold leading-none tracking-tight">Keranjang</h2>
+            <p className="mt-1 text-[12px] text-muted">${count} barang</p>
+          </div>
+          <button type="button" onClick=${props.onClose} aria-label="Tutup keranjang" className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-card hover:bg-soft"><${Icon} name="X" size=${19} /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          ${count === 0 ? html`<div className="grid place-items-center gap-3 rounded-2xl border border-dashed border-line px-6 py-12 text-center">
+              <span className="grid h-14 w-14 place-items-center rounded-2xl bg-soft text-muted"><${Icon} name="ShoppingBag" size=${26} /></span>
+              <div><p className="font-semibold">Keranjang masih kosong</p>
+              <p className="mt-1 text-[13px] text-muted">Pilih barang dari katalog atau isi request custom.</p></div>
+              <button type="button" onClick=${props.onClose} className="rounded-xl bg-acc px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-acc-h">Lihat Katalog</button>
+            </div>` : html`<div className="grid gap-5">
+            <ul className="grid gap-2.5">
+              ${items.map(function (x) {
+                return html`<li key=${x.key} className="flex gap-3 rounded-2xl border border-line bg-card p-2.5">
+                  <div className="tile grid h-16 w-16 shrink-0 place-items-center rounded-xl" style=${{ '--h': x.p.hue }}><${Icon} name=${x.p.icon || CAT_ICON[x.p.category] || 'Package'} size=${24} stroke=${1.6} /></div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 text-[13px] font-semibold leading-snug">${x.p.name}</p>
+                      <button type="button" onClick=${function () { props.onRemove(x.key); }} aria-label=${'Hapus ' + x.p.name} className="shrink-0 text-muted hover:text-red-600"><${Icon} name="Trash2" size=${16} /></button>
+                    </div>
+                    <p className="mt-0.5 truncate text-[12px] text-muted">${x.variant}</p>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1 rounded-lg border border-line bg-soft p-0.5">
+                        <button type="button" aria-label="Kurangi" onClick=${function () { props.onQty(x.key, -1); }} className="grid h-7 w-7 place-items-center rounded-md bg-card"><${Icon} name="Minus" size=${13} /></button>
+                        <span className="min-w-[2.2ch] text-center text-[13px] font-bold tabular-nums">${x.qty}</span>
+                        <button type="button" aria-label="Tambah" onClick=${function () { props.onQty(x.key, 1); }} className="grid h-7 w-7 place-items-center rounded-md bg-card"><${Icon} name="Plus" size=${13} /></button>
+                      </div>
+                      <span className="text-[13.5px] font-bold tabular-nums">${x.p.price ? rupiah(x.p.price * x.qty) : 'Tanya admin'}</span>
+                    </div>
+                  </div>
+                </li>`;
+              })}
+              ${customs.map(function (c) {
+                return html`<li key=${c.id} className="flex gap-3 rounded-2xl border border-dashed border-line bg-card p-2.5">
+                  <div className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-soft text-muted"><${Icon} name="Store" size=${24} stroke=${1.6} /></div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 break-words text-[13px] font-semibold leading-snug">${c.name}</p>
+                      <button type="button" onClick=${function () { props.onRemoveCustom(c.id); }} aria-label=${'Hapus ' + c.name} className="shrink-0 text-muted hover:text-red-600"><${Icon} name="Trash2" size=${16} /></button>
+                    </div>
+                    <p className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-muted">Request custom</p>
+                    ${c.store && html`<p className="mt-0.5 break-words text-[12px] text-muted">Toko: ${c.store}</p>`}
+                    ${c.spec && html`<p className="mt-0.5 break-words text-[12px] text-muted">Ukuran/Warna: ${c.spec}</p>`}
+                    <p className="mt-0.5 break-words text-[12px] text-muted">${c.note || 'Tanpa catatan'}</p>
+                    <p className="mt-1 text-[12px] font-semibold">Harga dikonfirmasi admin</p>
+                  </div>
+                </li>`;
+              })}
+            </ul>
+
+            <fieldset className="grid gap-2">
+              <legend className="mb-1 text-[13px] font-bold">Metode Pengiriman</legend>
+              ${Object.values(CONFIG.shipping).map(function (o) {
+                var on = ship === o.id;
+                return html`<label key=${o.id} className=${'flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ' + (on ? 'border-acc bg-soft' : 'border-line bg-card')}>
+                  <input type="radio" name="ship" value=${o.id} checked=${on} onChange=${function () { setShip(o.id); }} className="h-4 w-4 accent-emerald-600" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13.5px] font-semibold">${o.label}</span>
+                    <span className="block text-[12px] text-muted">${o.note}</span>
+                  </span>
+                  <span className="shrink-0 text-[13px] font-bold tabular-nums">${o.fee === 0 ? 'Rp 0' : rupiah(o.fee)}</span>
+                </label>`;
+              })}
+            </fieldset>
+
+            <div className="grid gap-3">
+              <div className="flex items-center justify-between gap-2"><h3 className="text-[13px] font-bold">Data Pemesan</h3><button type="button" onClick=${clearBuyer} className="text-[12px] font-semibold text-muted underline decoration-dotted underline-offset-2 hover:text-ink">Hapus data tersimpan</button></div>
+              <p className="-mt-1 text-[12px] text-muted">Data ini disimpan di perangkatmu supaya order berikutnya tidak perlu mengetik ulang.</p>
+              <div>
+                <label htmlFor="o-name" className="mb-1 block text-[12.5px] font-semibold">Nama Lengkap</label>
+                <input id="o-name" className="field" autoComplete="name" value=${cname} aria-invalid=${tried && errs.name ? 'true' : 'false'} onChange=${function (e) { setCname(e.target.value); }} placeholder="Nama sesuai KTP / panggilan" />
+                ${fieldErr('name')}
+              </div>
+              <div>
+                <label htmlFor="o-phone" className="mb-1 block text-[12.5px] font-semibold">Nomor WhatsApp</label>
+                <input id="o-phone" className="field" type="tel" inputMode="tel" autoComplete="tel" value=${phone} aria-invalid=${tried && errs.phone ? 'true' : 'false'} onChange=${function (e) { setPhone(e.target.value); }} placeholder="08xx xxxx xxxx" />
+                ${fieldErr('phone')}
+              </div>
+              <div>
+                <label htmlFor="o-addr" className="mb-1 block text-[12.5px] font-semibold">${ship === 'cod' ? 'Alamat Lengkap / Titik Ketemu' : 'Alamat Lengkap'}</label>
+                <textarea id="o-addr" rows="3" className="field resize-y" autoComplete="street-address" value=${addr} aria-invalid=${tried && errs.addr ? 'true' : 'false'} onChange=${function (e) { setAddr(e.target.value); }} placeholder="Jalan, nomor, kecamatan, patokan"></textarea>
+                ${fieldErr('addr')}
+              </div>
+            </div>
+          </div>`}
+        </div>
+
+        ${count > 0 && html`<div className="border-t border-line bg-card px-4 pb-4 pt-3.5">
+          <dl className="grid gap-1.5 text-[13px]">
+            <div className="flex justify-between"><dt className="text-muted">Subtotal${unpriced ? ' (barang berharga)' : ''}</dt><dd className="font-semibold tabular-nums">${rupiah(subtotal)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">Ongkir</dt><dd className="font-semibold tabular-nums">${shipping.fee === 0 ? 'Rp 0' : rupiah(shipping.fee)}</dd></div>
+            <div className="flex items-baseline justify-between border-t border-line pt-2"><dt className="font-bold">Total Estimasi</dt><dd className="font-display text-[20px] font-extrabold tabular-nums">${rupiah(total)}</dd></div>
+          </dl>
+          <p className="mt-2 text-[12px] leading-snug text-muted">DP minimal 50% saat konfirmasi${subtotal > 0 ? ' (sekitar ' + rupiah(dp) + ')' : ''}.${unpriced ? ' Barang tanpa harga (request custom atau tanya admin) belum termasuk dan dikonfirmasi admin.' : ''}</p>
+          ${tried && !valid && html`<p className="mt-2 rounded-lg bg-soft px-3 py-2 text-[12px] font-medium text-red-600" role="alert">Lengkapi data pemesan di atas sebelum mengirim.</p>`}
+          <a href=${href} target="_blank" rel="noopener noreferrer" onClick=${onSend}
+            className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-acc px-4 py-3.5 text-[14.5px] font-semibold text-white transition hover:bg-acc-h active:scale-[.99]">
+            <${Icon} name="MessageCircle" size=${19} /> Kirim Order via WhatsApp
+          </a>
+          <button type="button" onClick=${onCopy} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line px-4 py-2.5 text-[13px] font-semibold transition hover:bg-soft">
+            <${Icon} name=${copyState === 'ok' ? 'Check' : 'Send'} size=${15} /> ${copyState === 'ok' ? 'Pesan tersalin' : 'Salin pesan (kalau WhatsApp tidak terbuka)'}
+          </button>
+          ${copyState === 'fail' && html`<div className="mt-2">
+            <p className="mb-1 text-[12px] text-muted">Salin otomatis tidak berhasil. Tahan dan salin teks ini, lalu tempel di WhatsApp admin.</p>
+            <textarea readOnly rows="6" className="field text-[12px]" value=${buildMessage()} onFocus=${function (e) { e.target.select(); }}></textarea>
+          </div>`}
+        </div>`}
+      </aside>
+    </div>`;
+  }
+
+  /* ---------- App ---------- */
+  function App() {
+    var init = useMemo(loadCart, []);
+    var s1 = useState(init.items || []); var items = s1[0], setItems = s1[1];
+    var s2 = useState(init.customs || []); var customs = s2[0], setCustoms = s2[1];
+    var s3 = useState(false); var open = s3[0], setOpen = s3[1];
+    var s4 = useState(''); var query = s4[0], setQuery = s4[1];
+    var s5 = useState('Semua'); var cat = s5[0], setCat = s5[1];
+    var s6 = useState(null); var toast = s6[0], setToast = s6[1];
+    var sp = useState(PRODUCTS); var products = sp[0], setProducts = sp[1];
+    var toastTimer = useRef(null);
+
+    useEffect(function () {
+      try { localStorage.setItem('raar-cart', JSON.stringify({ items: items, customs: customs })); } catch (e) {}
+    }, [items, customs]);
+
+    useEffect(function () {
+      if (!CONFIG.sheetUrl) return;
+      var alive = true;
+      fetch(CONFIG.sheetUrl, { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(function (t) { var list = rowsToProducts(parseCSV(t)); if (alive && list.length) setProducts(list); })
+        .catch(function () {});
+      return function () { alive = false; };
+    }, []);
+
+    useEffect(function () {
+      function onKey(e) { if (e.key === 'Escape') setOpen(false); }
+      window.addEventListener('keydown', onKey);
+      return function () { window.removeEventListener('keydown', onKey); };
+    }, []);
+
+    useEffect(function () {
+      document.body.style.overflow = open ? 'hidden' : '';
+      return function () { document.body.style.overflow = ''; };
+    }, [open]);
+
+    function say(msg) {
+      setToast(msg);
+      clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(function () { setToast(null); }, 2200);
+    }
+
+    function addToCart(p, variant, qty) {
+      setItems(function (prev) {
+        var found = prev.find(function (x) { return x.pid === p.id && x.variant === variant; });
+        if (found) return prev.map(function (x) { return x === found ? { pid: x.pid, variant: x.variant, qty: Math.min(99, x.qty + qty) } : x; });
+        return prev.concat([{ pid: p.id, variant: variant, qty: qty }]);
+      });
+      say(qty + ' x ' + p.name + ' masuk keranjang');
+    }
+    function changeQty(key, delta) {
+      setItems(function (prev) {
+        return prev.map(function (x) { return (x.pid + '|' + x.variant) === key ? { pid: x.pid, variant: x.variant, qty: x.qty + delta } : x; })
+          .filter(function (x) { return x.qty > 0; });
+      });
+    }
+    function removeItem(key) { setItems(function (prev) { return prev.filter(function (x) { return (x.pid + '|' + x.variant) !== key; }); }); }
+    function addCustom(c) { setCustoms(function (prev) { return prev.concat([c]); }); say('Request custom masuk keranjang'); }
+    function removeCustom(id) { setCustoms(function (prev) { return prev.filter(function (c) { return c.id !== id; }); }); }
+
+    var count = items.reduce(function (t, x) { return t + (products.some(function (p) { return p.id === x.pid; }) ? x.qty : 0); }, 0) + customs.length;
+    var subtotal = items.reduce(function (t, x) {
+      var p = products.find(function (y) { return y.id === x.pid; });
+      return t + (p ? (p.price || 0) * x.qty : 0);
+    }, 0);
+
+    var showCustomOnly = cat === 'Request Custom';
+    var categories = useMemo(function () {
+      var present = [];
+      products.forEach(function (p) { if (present.indexOf(p.category) === -1) present.push(p.category); });
+      var ordered = CATEGORY_ORDER.filter(function (c) { return present.indexOf(c) !== -1; })
+        .concat(present.filter(function (c) { return CATEGORY_ORDER.indexOf(c) === -1; }));
+      return ['Semua'].concat(ordered, ['Request Custom']);
+    }, [products]);
+    var filtered = products.filter(function (p) {
+      var okCat = cat === 'Semua' || p.category === cat;
+      var okQ = p.name.toLowerCase().indexOf(query.trim().toLowerCase()) !== -1;
+      return okCat && okQ;
+    });
+
+    function pickCat(c) {
+      setCat(c);
+      if (c === 'Request Custom') {
+        setTimeout(function () {
+          var el = document.getElementById('request');
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 30);
+      }
+    }
+
+    return html`<div className="min-h-screen bg-bg text-ink">
+      <${AnnouncementBar} />
+      <${Header} count=${count} onOpen=${function () { setOpen(true); }} />
+
+      <main className="mx-auto grid max-w-6xl gap-8 px-4 pb-28 pt-5 sm:gap-10">
+        <section aria-label="Cari dan filter">
+          <h1 className="font-display text-[26px] font-extrabold leading-[1.1] tracking-tight sm:text-[34px]" style=${{ textWrap: 'balance' }}>Titip dari Malaysia, antar sampai Medan.</h1>
+          <p className="mt-2 max-w-[56ch] text-[14px] leading-relaxed text-muted">Pilih dari katalog batch ini atau titip barang apa saja lewat Request Custom. Pesanan dikirim ke admin lewat WhatsApp.</p>
+          <div className="relative mt-4">
+            <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted"><${Icon} name="Search" size=${18} /></span>
+            <label htmlFor="search" className="sr-only">Cari barang</label>
+            <input id="search" type="search" className="field !rounded-xl !py-3 !pl-10" placeholder="Cari nama barang, misalnya white coffee" value=${query} onChange=${function (e) { setQuery(e.target.value); }} />
+          </div>
+          <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1" role="tablist" aria-label="Kategori">
+            ${categories.map(function (c) {
+              var on = cat === c;
+              return html`<button key=${c} type="button" role="tab" aria-selected=${on} onClick=${function () { pickCat(c); }}
+                className=${'shrink-0 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition ' + (on ? 'border-acc bg-acc text-white' : 'border-line bg-card hover:bg-soft')}>${c}</button>`;
+            })}
+          </div>
+          ${cat === 'Edisi Diwali' && html`<p className="mt-3 rounded-xl bg-soft px-3.5 py-2.5 text-[13px] leading-relaxed text-muted">Edisi Diwali: harga dan stok dikonfirmasi admin lewat WhatsApp sebelum DP. Barang lain yang tidak ada di sini bisa dititip lewat Request Custom.</p>`}
+        </section>
+
+        ${!showCustomOnly && html`<section aria-label="Katalog produk">
+          ${filtered.length > 0 ? html`<div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+            ${filtered.map(function (p) { return html`<${ProductCard} key=${p.id} product=${p} onAdd=${addToCart} />`; })}
+          </div>` : html`<div className="rounded-2xl border border-dashed border-line px-6 py-12 text-center">
+            <p className="font-semibold">Tidak ada barang yang cocok</p>
+            <p className="mt-1 text-[13px] text-muted">Coba kata kunci lain, atau titip lewat Request Custom di bawah.</p>
+          </div>`}
+        </section>`}
+
+        <${CustomRequest} onAdd=${addCustom} />
+        <${FAQ} />
+
+        <footer className="border-t border-line pt-6 text-[13px] text-muted">
+          <p className="font-display text-[16px] font-extrabold text-ink">RAAR JASTIP</p>
+          <p className="mt-1">Jastip Malaysia - Medan. Admin WhatsApp: <span className="select-all font-semibold text-ink">+${CONFIG.waNumber}</span></p>
+          <p className="mt-1">Harga bisa berubah mengikuti kurs dan harga di toko saat dibelikan. Total akhir dikonfirmasi admin.</p>
+        </footer>
+      </main>
+
+      ${count > 0 && !open && html`<div className="fixed inset-x-0 bottom-0 z-20 px-4 pt-2" style=${{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+        <button type="button" onClick=${function () { setOpen(true); }} className="mx-auto flex w-full max-w-md items-center justify-between gap-3 rounded-2xl bg-acc px-4 py-3.5 text-white shadow-lg transition hover:bg-acc-h">
+          <span className="flex items-center gap-2 text-[14px] font-semibold"><${Icon} name="ShoppingBag" size=${18} /> Lihat Keranjang (${count})</span>
+          <span className="text-[14px] font-bold tabular-nums">${subtotal > 0 ? rupiah(subtotal) : 'Request custom'}</span>
+        </button>
+      </div>`}
+
+      ${toast && html`<div className="pointer-events-none fixed inset-x-0 top-16 z-[60] flex justify-center px-4" style=${{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <div className="toast flex max-w-sm items-center gap-2 rounded-xl bg-ann px-4 py-2.5 text-[13px] font-medium text-stone-100 shadow-lg" role="status">
+          <${Icon} name="Check" size=${16} /> <span className="min-w-0">${toast}</span>
+        </div>
+      </div>`}
+
+      <${CartDrawer} products=${products} open=${open} cart=${{ items: items, customs: customs }} onClose=${function () { setOpen(false); }}
+        onQty=${changeQty} onRemove=${removeItem} onRemoveCustom=${removeCustom} />
+    </div>`;
+  }
+
+  class Boundary extends React.Component {
+    constructor(p) { super(p); this.state = { err: null }; }
+    static getDerivedStateFromError(e) { return { err: e }; }
+    render() {
+      if (this.state.err) {
+        return React.createElement('div', { style: { padding: 24, fontFamily: 'system-ui, sans-serif' } },
+          React.createElement('h2', null, 'Terjadi error di aplikasi'),
+          React.createElement('pre', { style: { whiteSpace: 'pre-wrap', fontSize: 12 } }, String((this.state.err && (this.state.err.stack || this.state.err.message)) || this.state.err)));
+      }
+      return this.props.children;
+    }
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Boundary, null, React.createElement(App)));
+})();
+</script>
+
+</body>
+</html>
